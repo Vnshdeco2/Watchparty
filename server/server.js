@@ -49,6 +49,17 @@ io.on('connection', (socket) => {
       return callback({ success: false, message: "Incorrect password." });
     }
 
+    // Auto-fix: Handle "Ghost Users" (Reconnections)
+    // If a user with the same name joins, assume it's the same person reconnecting and remove the old entry.
+    const existingIdx = room.users.findIndex(u => u.name === userName);
+    if (existingIdx !== -1) {
+       const oldUser = room.users[existingIdx];
+       // 1. Remove old user from room state
+       room.users.splice(existingIdx, 1);
+       // 2. Notify clients (so they remove the old peer video/state)
+       io.to(roomId).emit('user-left', { userId: oldUser.id, userName: oldUser.name });
+    }
+
     if (room.users.length >= 2) {
       // Allow reconnect if IP/session matches? For now, hard limit to 2 active sockets.
       // A robust reconnect system would use persistent user IDs. 
