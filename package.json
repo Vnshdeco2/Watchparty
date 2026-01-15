@@ -1,0 +1,10 @@
+{
+  "name": "watch-party-root",
+  "version": "1.0.0",
+  "scripts": {
+    "share": "node share.js"
+  },
+  "dependencies": {
+    "localtunnel": "^2.0.2"
+  }
+}

@@ -1,0 +1,185 @@
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import { Copy, Users, LogOut } from 'lucide-react';
+import VideoPlayer from './VideoPlayer';
+import Chat from './Chat';
+
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || '/';
+
+export default function Room({ user }) {
+  const { roomId } = useParams();
+  const [searchParams] = useSearchParams();
+  const password = searchParams.get('pass') || '';
+  const isCreate = searchParams.get('create') === 'true';
+  const navigate = useNavigate();
+
+  const [socket, setSocket] = useState(null);
+  const [roomState, setRoomState] = useState(null);
+  // ... existing code ...
+
+  useEffect(() => {
+    // Configuration for Socket.IO
+    const options = {
+        transports: ['websocket', 'polling'],
+    };
+
+    // If we are using the local tunnel or proxy (SERVER_URL='/'), ensure path is correct
+    if (SERVER_URL === '/') {
+        options.path = '/socket.io';
+    } 
+    
+    // If using localtunnel specifically, add header to bypass warning page
+    if (window.location.hostname.includes('loca.lt')) {
+       options.extraHeaders = { "ngrok-skip-browser-warning": "true" };
+    }
+
+    const newSocket = io(SERVER_URL, options);
+    setSocket(newSocket);
+
+    // Join or Create Room
+    const event = isCreate ? 'create-room' : 'join-room';
+    
+    newSocket.emit(event, { roomId, password, userName: user.name }, (response) => {
+      if (!response.success) {
+        // If we tried to create but it exists (e.g. reload), try joining instead
+        if (isCreate && response.message === "Room ID already exists.") {
+            newSocket.emit('join-room', { roomId, password, userName: user.name }, (joinRes) => {
+                if (joinRes.success) {
+                    setRoomState(joinRes.room);
+                } else {
+                    setError(joinRes.message);
+                }
+            });
+        } else {
+            setError(response.message);
+        }
+      } else {
+        setRoomState(response.room);
+      }
+    });
+
+    newSocket.on('user-joined', ({ userName }) => {
+      // Could show toast
+      console.log(`${userName} joined`);
+    });
+
+    newSocket.on('user-left', ({ userName }) => {
+      // Could show toast
+      console.log(`${userName} left`);
+    });
+
+    newSocket.on('room-update', ({ users }) => {
+      setRoomState(prev => prev ? { ...prev, users } : null);
+    });
+
+    newSocket.on('receive-message', (msg) => {
+      setMessages(prev => [...prev, msg]);
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [roomId, password, user.name, navigate]);
+
+  // Derived State
+  const myUser = roomState?.users.find(u => u.id === socket?.id);
+  const otherUser = roomState?.users.find(u => u.id !== socket?.id);
+  const peersReady = otherUser?.ready; // Simplified: check if partner is ready
+
+  // Actions
+  const handleSendMessage = (text) => {
+    if (socket) {
+      socket.emit('send-message', { roomId, message: text, userName: user.name });
+    }
+  };
+
+  const handleFileSelect = (loaded) => {
+    setIsFileLoaded(loaded);
+    socket.emit('status-update', { roomId, type: 'fileLoaded', value: loaded });
+  };
+
+  const handleReady = () => {
+    setIsReady(true);
+    socket.emit('status-update', { roomId, type: 'ready', value: true });
+  };
+
+  const copyLink = () => {
+    const url = window.location.href.split('?')[0] + `?pass=${password}`;
+    navigator.clipboard.writeText(url);
+    alert('Link copied to clipboard!');
+  };
+
+  const leaveRoom = () => {
+    if (socket) socket.disconnect();
+    navigate('/lobby');
+  };
+
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black text-red-500">
+        <h2 className="text-2xl font-bold">{error}</h2>
+      </div>
+    );
+  }
+
+  if (!roomState) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black text-white">
+        <div className="animate-spin h-8 w-8 border-4 border-red-500 rounded-full border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col md:flex-row h-[100dvh] bg-neutral-900 overflow-hidden">
+      {/* Sidebar Chat (Order 1 on Desktop, Order 2 on Mobile) */}
+      <div className="flex flex-col w-full md:w-80 h-[65%] md:h-full bg-neutral-900 md:bg-neutral-800 border-t md:border-t-0 md:border-r border-neutral-700 order-2 md:order-1 z-10">
+        <div className="p-3 md:p-4 border-b border-neutral-700 bg-neutral-800">
+           <div className="flex justify-between items-center mb-1">
+             <div className="flex flex-col">
+                <h2 className="font-bold text-base md:text-lg text-white">Room <span className="font-mono text-red-500">{roomId.substr(0,4)}</span></h2>
+                <span className="text-[10px] text-neutral-500 font-mono hidden md:inline">ID: {roomId}</span>
+             </div>
+             <div className="flex gap-2">
+                <button onClick={copyLink} className="p-2 bg-neutral-700 hover:bg-neutral-600 rounded-full text-white" title="Copy Link">
+                    <Copy size={16} />
+                </button>
+                <button onClick={leaveRoom} className="p-2 bg-neutral-700 hover:bg-red-900/50 rounded-full text-red-500" title="Leave Room">
+                    <LogOut size={16} />
+                </button>
+             </div>
+           </div>
+           <div className="text-xs text-neutral-400 flex items-center gap-2">
+             <Users size={12} />
+             {roomState?.users.length || 0}/2 Users
+           </div>
+        </div>
+        
+        <Chat 
+          messages={messages} 
+          onSendMessage={handleSendMessage} 
+          user={{ ...user, socketId: socket?.id }}
+        />
+      </div>
+
+      {/* Main Content (Video) (Order 2 on Desktop, Order 1 on Mobile) */}
+      <div className="w-full md:flex-1 h-[35%] md:h-full relative flex flex-col min-w-0 order-1 md:order-2 bg-black">
+        <VideoPlayer 
+          socket={socket}
+          roomId={roomId}
+          isReady={isReady}
+          onReady={handleReady}
+          peersReady={peersReady}
+          onFileSelect={handleFileSelect}
+          onLeave={leaveRoom}
+          chatProps={{ 
+            messages, 
+            onSendMessage: handleSendMessage, 
+            user: { ...user, socketId: socket?.id } 
+          }}
+        />
+      </div>
+    </div>
+  );
+}
