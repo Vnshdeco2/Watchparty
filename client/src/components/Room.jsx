@@ -57,7 +57,8 @@ export default function Room({ user }) {
             newSocket.emit(event, { roomId, password, userName: user.name }, (response) => {
                 if (!response.success) {
                     // Auto-fix: If failed to create because exists, try joining
-                    if (isCreate && response.message === "Room ID already exists.") {
+                    // Also handle the specific server message I added earlier: "Room ID already exists. Try joining it."
+                    if (isCreate) {
                         newSocket.emit('join-room', { roomId, password, userName: user.name }, (joinRes) => {
                             if (joinRes.success) {
                                 setRoomState(joinRes.room);
