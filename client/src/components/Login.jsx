@@ -1,23 +1,52 @@
-import React, { useState } from 'react';
-import { Play } from 'lucide-react';
-import { useTheme } from './ThemeContext';
+import React, { useState, useEffect } from 'react';
+import { Play, Loader2, AlertCircle } from 'lucide-react';
+import { io } from 'socket.io-client';
+
+// Reuse the server URL logic
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
 
 export default function Login({ onJoin }) {
-  const [isLogin, setIsLogin] = useState(true); // Login vs Signup
+  const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { currentTheme } = useTheme(); // Just for initial styling (we might default to dark)
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [socket, setSocket] = useState(null);
+
+  // Initialize a socket just for auth
+  useEffect(() => {
+    const newSocket = io(SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+    });
+    setSocket(newSocket);
+    return () => newSocket.disconnect();
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) return;
+    if (!socket) {
+        setError("Connecting to server... please wait.");
+        return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    const event = isLogin ? 'auth-login' : 'auth-signup';
     
-    // In a real app, we'd verify with server.
-    // For now, we trust the client and save to local storage as requested.
-    // "when they first enter... they will set there username... set up there password... use that same id"
-    
-    const userData = { name: username, id: username.toLowerCase() }; // ID is handle
-    onJoin(userData);
+    socket.emit(event, { username, password }, (response) => {
+        setIsLoading(false);
+        if (response.success) {
+            // Success!
+            onJoin(response.user);
+        } else {
+            // Error (Wrong password, User exists, User not found rule)
+            setError(response.message);
+        }
+    });
   };
 
   return (
@@ -33,13 +62,13 @@ export default function Login({ onJoin }) {
 
         <div className="flex w-full bg-neutral-800 rounded-lg p-1 mb-6">
             <button 
-                onClick={() => setIsLogin(true)}
+                onClick={() => { setIsLogin(true); setError(null); }}
                 className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${isLogin ? 'bg-neutral-700 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
             >
                 Login
             </button>
             <button 
-                onClick={() => setIsLogin(false)}
+                onClick={() => { setIsLogin(false); setError(null); }}
                 className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${!isLogin ? 'bg-neutral-700 text-white shadow' : 'text-neutral-400 hover:text-white'}`}
             >
                 Sign Up
@@ -47,6 +76,13 @@ export default function Login({ onJoin }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-3 rounded-lg text-sm flex items-center gap-2">
+                <AlertCircle size={16} />
+                {error}
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-neutral-400 uppercase mb-1">Username</label>
             <input 
@@ -55,6 +91,7 @@ export default function Login({ onJoin }) {
               onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-red-500"
               placeholder="e.g. Vansh"
+              disabled={isLoading}
             />
           </div>
           <div>
@@ -65,14 +102,16 @@ export default function Login({ onJoin }) {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-red-500"
               placeholder="••••••••"
+              disabled={isLoading}
             />
           </div>
           
           <button 
             type="submit" 
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-transform active:scale-95"
+            disabled={isLoading}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
           >
-            {isLogin ? 'Enter Party' : 'Create Account'}
+            {isLoading ? <Loader2 className="animate-spin" size={20} /> : (isLogin ? 'Login' : 'Create Account')}
           </button>
         </form>
         
