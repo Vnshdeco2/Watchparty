@@ -61,10 +61,15 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
     <div className={clsx(
       "flex flex-col transition-all duration-300",
       isOverlay 
-        ? (isOpen 
-            ? "absolute bottom-24 right-4 z-50 w-96 h-[60%] bg-black/80 backdrop-blur border border-white/10 rounded-xl" 
-            : "absolute bottom-24 right-4 z-50 w-96 max-h-[60%] justify-end pointer-events-none")
-        : "h-full bg-neutral-800 border-r border-neutral-700 w-80"
+        ? clsx(
+            "absolute z-50",
+            // Position: anchored to bottom-right, but shifted up slightly on desktop
+            "bottom-20 right-2 md:bottom-24 md:right-4",
+            isOpen 
+                ? "w-[85vw] md:w-96 h-[45vh] md:h-[60%] bg-black/95 backdrop-blur border border-white/10 rounded-xl shadow-2xl" 
+                : "w-[70vw] md:w-72 max-h-[40vh] justify-end pointer-events-none" 
+          )
+        : "h-full bg-neutral-800 border-r border-neutral-700 w-full md:w-80"
     )}>
       {/* Header */}
       {(!isOverlay || (isOverlay && isOpen)) && (
