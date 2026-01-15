@@ -11,7 +11,9 @@ const io = new Server(server, {
   cors: {
     origin: "*", // For production, replace with your frontend URL
     methods: ["GET", "POST"]
-  }
+  },
+  pingTimeout: 60000, // Wait 60s before declaring dead (helps mobile)
+  pingInterval: 25000 // Send heartbeats every 25s
 });
 
 // Store room state in memory

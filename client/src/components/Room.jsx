@@ -26,6 +26,7 @@ export default function Room({ user }) {
   const [isFileLoaded, setIsFileLoaded] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set()); // Track who is typing
+  const [isConnected, setIsConnected] = useState(true); // Track connection health
 
   useEffect(() => {
     console.log("Connecting to Server:", SERVER_URL);
@@ -35,11 +36,18 @@ export default function Room({ user }) {
     const newSocket = io(SERVER_URL, {
         transports: ['websocket', 'polling'], // Try websocket first
         reconnection: true,
-        reconnectionAttempts: 20, // Try for a while (wakeup can take 60s)
+        reconnectionAttempts: Infinity, // Keep trying!
         reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
     });
     setSocket(newSocket);
 
+    // Monitor Connection Health
+    newSocket.on('connect', () => setIsConnected(true));
+    newSocket.on('disconnect', () => setIsConnected(false));
+    newSocket.on('connect_error', () => setIsConnected(false));
+    
     // Join or Create Room
     const event = isCreate ? 'create-room' : 'join-room';
     
@@ -185,6 +193,11 @@ export default function Room({ user }) {
     <div className="flex flex-col md:flex-row h-[100dvh] bg-neutral-900 overflow-hidden">
       {/* Sidebar Chat (Order 1 on Desktop, Order 2 on Mobile) */}
       <div className="flex flex-col w-full md:w-80 h-[65%] md:h-full bg-neutral-900 md:bg-neutral-800 border-t md:border-t-0 md:border-r border-neutral-700 order-2 md:order-1 z-10">
+        {!isConnected && (
+            <div className="bg-red-600 text-white text-xs p-1 text-center font-bold uppercase tracking-wider animate-pulse">
+                Reconnecting to server...
+            </div>
+        )}
         <div className="p-3 md:p-4 border-b border-neutral-700 bg-neutral-800">
            <div className="flex justify-between items-center mb-1">
              <div className="flex flex-col">

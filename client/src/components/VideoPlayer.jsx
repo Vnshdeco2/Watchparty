@@ -73,6 +73,8 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
   };
 
   const onSeeked = () => {
+    // CRITICAL: Do not emit 'seek' if this seek was caused by a remote update
+    if (isRemoteUpdate.current) return;
     emitEvent('seek');
   };
 
@@ -315,6 +317,7 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
           onPause={onPause}
           onSeeked={onSeeked}
           onRateChange={onRateChange}
+          playsInline
         />
       )}
 
