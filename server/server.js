@@ -17,23 +17,60 @@ const io = new Server(server, {
 });
 
 // Store room state in memory
-// roomID -> { password, users: [{id, name, ready}], active: bool }
+// roomID -> { password, users: [{id, name, ready}], active: bool, stats: { createdBy, createdAt, totalMessages, totalVideos } }
 const rooms = {};
+
+// Store users in memory (Note: On Render Free Tier, this resets on restart/sleep)
+// username -> { password, created, stats: { messagesSent } }
+const users = {};
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
+  // --- Auth ---
+  socket.on('auth-signup', ({ username, password }, callback) => {
+    if (users[username]) {
+      return callback({ success: false, message: "Username already taken." });
+    }
+    users[username] = {
+      password, // In real app, hash this!
+      created: new Date().toISOString(),
+      stats: { messagesSent: 0 }
+    };
+    callback({ success: true, user: { name: username, created: users[username].created } });
+  });
+
+  socket.on('auth-login', ({ username, password }, callback) => {
+    const user = users[username];
+    if (!user) {
+      return callback({ success: false, message: "User not found." });
+    }
+    if (user.password !== password) {
+      return callback({ success: false, message: "Incorrect password." });
+    }
+    callback({ success: true, user: { name: username, created: user.created } });
+  });
+
   // --- Room Management ---
 
-  socket.on('create-room', ({ roomId, password, userName }, callback) => {
+  socket.on('create-room', ({ roomId, password, userName, isPermanent }, callback) => {
     if (rooms[roomId]) {
-      return callback({ success: false, message: "Room ID already exists." });
+      // If it's a permanent room and the password matches, allow "re-opening" or joining
+      // But for simplicity, we treat existing rooms as "Join Only" except if we want to "claim" it.
+      return callback({ success: false, message: "Room ID already exists. Try joining it." });
     }
     
     rooms[roomId] = {
       password,
+      permanent: !!isPermanent,
       users: [{ id: socket.id, name: userName, ready: false, fileLoaded: false }],
-      chatHistory: []
+      chatHistory: [],
+      stats: {
+        createdBy: userName,
+        createdAt: new Date().toISOString(),
+        totalMessages: 0,
+        totalVideos: 0
+      }
     };
     
     socket.join(roomId);
