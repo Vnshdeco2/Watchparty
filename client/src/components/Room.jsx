@@ -7,6 +7,7 @@ import Chat from './Chat';
 
 // Use the Vercel ENV VAR first (Production)
 // Fallback to localhost (Development)
+// Added at: {new Date().toISOString()}
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
 
 export default function Room({ user }) {
