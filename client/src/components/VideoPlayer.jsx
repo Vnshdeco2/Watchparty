@@ -229,41 +229,93 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
   };
 
   const lastClickTime = useRef(0);
+  const clickCount = useRef(0);
+  const clickTimeout = useRef(null);
+  const lastClickX = useRef(0);
+  const [seekOverlay, setSeekOverlay] = useState(null); // { direction: 'left'|'right', seconds: 10 }
+
   const handleVideoClick = (e) => {
-    const now = Date.now();
-    const rect = e.target.getBoundingClientRect();
+    // 1. Get click position info relative to screen width
+    const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
+    const width = rect.width;
     
-    if (now - lastClickTime.current < 300) {
-      // Double click
-      if (x < rect.width / 3) {
-        // Left side: Rewind
-        if (videoRef.current) videoRef.current.currentTime -= 10;
-      } else if (x > (rect.width * 2) / 3) {
-        // Right side: Forward
-        if (videoRef.current) videoRef.current.currentTime += 10;
-      } else {
-        toggleFullscreen();
-      }
-    } else {
-      // Single click (wait to see if double?) 
-      // Simplified: Toggle play immediately, double click will just seek too.
-      togglePlay();
+    const isLeft = x < width * 0.35; // Left 35%
+    const isRight = x > width * 0.65; // Right 35%
+    
+    // 2. If center tap, just toggle controls/play immediately (ignoring multi-tap for simpler center control)
+    if (!isLeft && !isRight) {
+         // Reset any pending seek detection
+         clickCount.current = 0;
+         if (clickTimeout.current) clearTimeout(clickTimeout.current);
+         
+         // Toggle UI
+         setShowControls(prev => !prev);
+         if (showControls) {
+             // If we are hiding controls, we probably want to play/pause too? 
+             // Or let play button do that. Let's just toggle controls for center tap on mobile.
+             // But users expect Tap to Pause.
+             togglePlay(); 
+         } 
+         return;
     }
-    lastClickTime.current = now;
+
+    // 3. Handle Side Taps (Gesture Seeking)
+    const area = isLeft ? 'left' : 'right';
+    
+    // Check if continuing a sequence
+    if (clickTimeout.current && lastClickX.current === area) {
+        clearTimeout(clickTimeout.current);
+        clickCount.current += 1;
+    } else {
+        clickCount.current = 1;
+        lastClickX.current = area;
+    }
+    
+    // Set timeout to execute action
+    clickTimeout.current = setTimeout(() => {
+        if (clickCount.current >= 2) {
+            // Formula: 2 clicks=10s, 3=20s => (N-1)*10
+            const seconds = (clickCount.current - 1) * 10;
+            
+            if (videoRef.current) {
+                if (area === 'right') videoRef.current.currentTime += seconds;
+                else videoRef.current.currentTime -= seconds;
+            }
+            
+            // Show Feedback
+            setSeekOverlay({ direction: area, seconds });
+            setTimeout(() => setSeekOverlay(null), 1000);
+        } else {
+            // Single tap on side -> Just toggle controls/play like center
+            togglePlay();
+            setShowControls(prev => !prev);
+        }
+        clickCount.current = 0;
+    }, 300);
   };
 
   return (
     <div 
       ref={containerRef}
-      className="relative w-full h-full bg-black group flex items-center justify-center overflow-hidden"
+      className={clsx("relative w-full h-full bg-black group flex items-center justify-center overflow-hidden select-none")}
       onMouseMove={() => { setShowControls(true); clearTimeout(window.controlsTimeout); window.controlsTimeout = setTimeout(() => setShowControls(false), 3000); }}
-      onClick={() => {
-        // Mobile tap to show controls
-        setShowControls(true);
-        setTimeout(() => setShowControls(false), 3000);
-      }}
+      onClick={handleVideoClick}
     >
+      {/* Seek Overlay Feedback */}
+      {seekOverlay && (
+        <div className={clsx(
+            "absolute top-0 bottom-0 flex items-center justify-center w-1/2 bg-white/10 z-30 animate-pulse text-white font-bold text-lg pointer-events-none",
+            seekOverlay.direction === 'left' ? "left-0 rounded-r-full" : "right-0 rounded-l-full"
+        )}>
+            <div className="flex flex-col items-center">
+                <span>{seekOverlay.direction === 'left' ? '<<' : '>>'}</span>
+                <span>{seekOverlay.seconds}s</span>
+            </div>
+        </div>
+      )}
+
+      {/* Local File Picker Overlay (If not loaded) */}
       {/* Local File Picker Overlay (If not loaded) */}
       {!localFileUrl && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-neutral-900/90 text-white">
@@ -311,8 +363,7 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
         <video
           ref={videoRef}
           src={localFileUrl}
-          className="w-full h-full object-contain"
-          onClick={handleVideoClick}
+          className="w-full h-full object-contain pointer-events-none" 
           onPlay={onPlay}
           onPause={onPause}
           onSeeked={onSeeked}
