@@ -86,7 +86,14 @@ export default function Room({ user }) {
     });
 
     newSocket.on('receive-message', (msg) => {
-      setMessages(prev => [...prev, msg]);
+      setMessages(prev => {
+        // Optimistic UI Deduplication
+        const last = prev[prev.length - 1];
+        if (last && last.senderName === msg.senderName && last.text === msg.text) {
+             return prev;
+        }
+        return [...prev, msg];
+      });
     });
 
     return () => {
@@ -103,6 +110,15 @@ export default function Room({ user }) {
   // Actions
   const handleSendMessage = (text) => {
     if (socket) {
+      // Optimistic UI: Show immediately
+      const tempMsg = {
+          text,
+          senderName: user.name,
+          senderId: socket.id,
+          timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, tempMsg]);
+
       socket.emit('send-message', { roomId, message: text, userName: user.name });
     }
   };

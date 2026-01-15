@@ -94,15 +94,33 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
       
       isRemoteUpdate.current = true; // Suppress echo
 
-      // Apply State
-      if (Math.abs(videoRef.current.currentTime - remoteTime) > 0.5) {
+      // --- Smart Sync Logic ---
+      const isSyncTick = action === 'syncTick';
+      const threshold = isSyncTick ? 2.0 : 0.5; // Tolerant for drift checks, strict for actions
+
+      const diff = Math.abs(videoRef.current.currentTime - remoteTime);
+
+      // 1. Time Sync
+      if (diff > threshold) {
+        console.log(`Syncing time: Local ${videoRef.current.currentTime} vs Remote ${remoteTime}`);
         videoRef.current.currentTime = remoteTime;
       }
       
-      if (remoteIsPlaying && videoRef.current.paused) {
-        videoRef.current.play().catch(e => console.log("Autoplay blocked", e));
-      } else if (!remoteIsPlaying && !videoRef.current.paused) {
-        videoRef.current.pause();
+      // 2. Play/Pause State Sync
+      // Only "syncTick" should NOT force pause (prevent buffering loops)
+      // Explicit actions ('play', 'pause') ALWAYS execute.
+      if (!isSyncTick || remoteIsPlaying) {
+          if (remoteIsPlaying && videoRef.current.paused) {
+            videoRef.current.play().catch(e => console.log("Autoplay blocked", e));
+          } else if (!remoteIsPlaying && !videoRef.current.paused) {
+            // Only pause if it wasn't a background tick (unless we really are way off?)
+            // Actually, if it's a 'pause' event, we must pause.
+            // If it's a 'syncTick' and remote is paused, we ignore it to prevent
+            // one person pausing causing the other to pause if they are just lagging.
+            if (!isSyncTick) {
+                 videoRef.current.pause();
+            }
+          }
       }
 
       if (videoRef.current.playbackRate !== remoteRate) {
