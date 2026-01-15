@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, X } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useTheme } from './ThemeContext';
 
 export default function Chat({ messages, onSendMessage, user, isOverlay = false, isOpen = false, onOpen, onClose, typingUsers = [], onTyping }) {
+  const { theme } = useTheme();
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -69,13 +71,13 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
                 ? "w-[85vw] md:w-96 h-[45vh] md:h-[60%] bg-black/95 backdrop-blur border border-white/10 rounded-xl shadow-2xl" 
                 : "w-[70vw] md:w-72 max-h-[40vh] justify-end pointer-events-none" 
           )
-        : "h-full bg-neutral-800 border-r border-neutral-700 w-full md:w-80"
+        : clsx("h-full border-r w-full md:w-80", theme.panel, theme.border)
     )}>
       {/* Header */}
       {(!isOverlay || (isOverlay && isOpen)) && (
-        <div className="p-4 border-b border-white/10 font-bold flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageSquare size={20} className="text-red-500" />
+        <div className={clsx("p-4 border-b font-bold flex items-center justify-between", isOverlay ? "border-white/10" : theme.border)}>
+          <div className={clsx("flex items-center gap-2", theme.text)}>
+            <MessageSquare size={20} className={theme.accent} />
             Chat
           </div>
           {isOverlay && (
@@ -112,7 +114,7 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
                 isOverlay ? (
                     isMe ? "bg-red-600/90 text-white backdrop-blur-md" : "bg-neutral-800/90 text-white backdrop-blur-md border border-white/10"
                 ) : (
-                  isMe ? "bg-red-600 text-white" : "bg-neutral-700 text-neutral-200"
+                  isMe ? clsx(theme.chatBubbleSelf, "text-white") : clsx(theme.chatBubbleOther, theme.text)
                 )
               )}>
                 {!isMe && <div className="text-[10px] font-bold opacity-70 mb-0.5">{msg.senderName}</div>}
@@ -123,7 +125,7 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
         })}
         {/* Typing Indicator */}
         {typingUsers.length > 0 && (
-            <div className="text-xs text-neutral-500 italic px-2 pb-1 animate-pulse">
+            <div className={clsx("text-xs italic px-2 pb-1 animate-pulse", theme.textSecondary)}>
                 {typingUsers.join(', ')} is typing...
             </div>
         )}
@@ -135,7 +137,7 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
         "p-4",
         isOverlay 
             ? (isOpen ? "border-t border-white/10" : "opacity-0 h-0 p-0 overflow-hidden") 
-            : "border-t border-neutral-700 bg-neutral-800"
+            : clsx("border-t", theme.border, theme.panel)
       )}>
         <form onSubmit={handleSend} className="relative">
           <input
@@ -143,11 +145,20 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
             value={inputText}
             onChange={handleInput}
             placeholder="Type a message..."
-            className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-full pl-4 pr-10 py-2 focus:outline-none focus:border-red-500 text-sm shadow-lg"
+            className={clsx(
+              "w-full border rounded-full pl-4 pr-10 py-2 focus:outline-none text-sm shadow-lg",
+              isOverlay ? "bg-neutral-900 border-neutral-700 text-white focus:border-red-500" 
+                        : clsx(theme.inputBg, theme.border, theme.text, `focus:${theme.border.replace('border-', 'border-')}`) // Simplified focus
+            )}
+            style={!isOverlay ? { borderColor: 'inherit' } : {}} // small hack if focus ring needed
           />
           <button 
             type="submit"
-            className="absolute right-1 top-1 p-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition"
+            className={clsx(
+              "absolute right-1 top-1 p-1.5 rounded-full transition",
+              isOverlay ? "bg-red-600 text-white hover:bg-red-700"
+                        : clsx(theme.accentBg, "text-white hover:opacity-90")
+            )}
           >
             <Send size={14} />
           </button>
