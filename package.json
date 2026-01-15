@@ -5,6 +5,9 @@
     "share": "node share.js"
   },
   "dependencies": {
-    "localtunnel": "^2.0.2"
+    "clsx": "^2.1.1",
+    "localtunnel": "^2.0.2",
+    "lucide-react": "^0.562.0",
+    "tailwind-merge": "^3.4.0"
   }
 }
