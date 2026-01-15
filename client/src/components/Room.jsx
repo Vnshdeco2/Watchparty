@@ -1,11 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { Copy, Users, LogOut, Palette } from 'lucide-react';
-import { clsx } from 'clsx';
+import { Copy, Users, LogOut } from 'lucide-react';
 import VideoPlayer from './VideoPlayer';
 import Chat from './Chat';
-import { useTheme } from './ThemeContext';
 
 // Use the Vercel ENV VAR first (Production)
 // Fallback to localhost (Development)
@@ -18,13 +16,6 @@ export default function Room({ user }) {
   const password = searchParams.get('pass') || '';
   const isCreate = searchParams.get('create') === 'true';
   const navigate = useNavigate();
-  const { theme, currentTheme, setCurrentTheme } = useTheme();
-
-  const toggleTheme = () => {
-    const themeOrder = ['classic', 'spotify', 'helloKitty'];
-    const nextIndex = (themeOrder.indexOf(currentTheme) + 1) % themeOrder.length;
-    setCurrentTheme(themeOrder[nextIndex]);
-  };
 
   const [socket, setSocket] = useState(null);
   const [roomState, setRoomState] = useState(null);
@@ -200,33 +191,30 @@ export default function Room({ user }) {
   }
 
   return (
-    <div className={clsx("flex flex-col md:flex-row h-[100dvh] overflow-hidden", theme.bg)}>
+    <div className="flex flex-col md:flex-row h-[100dvh] bg-neutral-900 overflow-hidden">
       {/* Sidebar Chat (Order 1 on Desktop, Order 2 on Mobile) */}
-      <div className={clsx("flex flex-col w-full md:w-80 h-[65%] md:h-full border-t md:border-t-0 md:border-r order-2 md:order-1 z-10", theme.panel, theme.border)}>
+      <div className="flex flex-col w-full md:w-80 h-[65%] md:h-full bg-neutral-900 md:bg-neutral-800 border-t md:border-t-0 md:border-r border-neutral-700 order-2 md:order-1 z-10">
         {!isConnected && (
             <div className="bg-red-600 text-white text-xs p-1 text-center font-bold uppercase tracking-wider animate-pulse">
                 Reconnecting to server...
             </div>
         )}
-        <div className={clsx("p-3 md:p-4 border-b", theme.panel, theme.border)}>
+        <div className="p-3 md:p-4 border-b border-neutral-700 bg-neutral-800">
            <div className="flex justify-between items-center mb-1">
              <div className="flex flex-col">
-                <h2 className={clsx("font-bold text-base md:text-lg", theme.text)}>Room <span className={clsx("font-mono", theme.accent)}>{roomId.substr(0,4)}</span></h2>
-                <span className={clsx("text-[10px] font-mono hidden md:inline", theme.textSecondary)}>ID: {roomId}</span>
+                <h2 className="font-bold text-base md:text-lg text-white">Room <span className="font-mono text-red-500">{roomId.substr(0,4)}</span></h2>
+                <span className="text-[10px] text-neutral-500 font-mono hidden md:inline">ID: {roomId}</span>
              </div>
              <div className="flex gap-2">
-                <button onClick={toggleTheme} className={clsx("p-2 rounded-full transition", theme.buttonBg, theme.buttonHover, theme.text)} title={`Theme: ${theme.name}`}>
-                    <Palette size={16} />
-                </button>
-                <button onClick={copyLink} className={clsx("p-2 rounded-full transition", theme.buttonBg, theme.buttonHover, theme.text)} title="Copy Link">
+                <button onClick={copyLink} className="p-2 bg-neutral-700 hover:bg-neutral-600 rounded-full text-white" title="Copy Link">
                     <Copy size={16} />
                 </button>
-                <button onClick={leaveRoom} className={clsx("p-2 rounded-full transition", theme.buttonBg, "hover:bg-red-900/50 text-red-500")} title="Leave Room">
+                <button onClick={leaveRoom} className="p-2 bg-neutral-700 hover:bg-red-900/50 rounded-full text-red-500" title="Leave Room">
                     <LogOut size={16} />
                 </button>
              </div>
            </div>
-           <div className={clsx("text-xs flex items-center gap-2", theme.textSecondary)}>
+           <div className="text-xs text-neutral-400 flex items-center gap-2">
              <Users size={12} />
              {roomState?.users.length || 0}/2 Users
            </div>
