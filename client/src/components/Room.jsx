@@ -5,7 +5,9 @@ import { Copy, Users, LogOut } from 'lucide-react';
 import VideoPlayer from './VideoPlayer';
 import Chat from './Chat';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || '/';
+// Use the Vercel ENV VAR first (Production)
+// Fallback to localhost (Development)
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
 
 export default function Room({ user }) {
   const { roomId } = useParams();
@@ -16,48 +18,57 @@ export default function Room({ user }) {
 
   const [socket, setSocket] = useState(null);
   const [roomState, setRoomState] = useState(null);
-  // ... existing code ...
+  const [messages, setMessages] = useState([]);
+  const [error, setError] = useState(null);
+  
+  // My State
+  const [isFileLoaded, setIsFileLoaded] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Configuration for Socket.IO
-    const options = {
-        transports: ['websocket', 'polling'],
-    };
-
-    // If we are using the local tunnel or proxy (SERVER_URL='/'), ensure path is correct
-    if (SERVER_URL === '/') {
-        options.path = '/socket.io';
-    } 
+    console.log("Connecting to Server:", SERVER_URL);
     
-    // If using localtunnel specifically, add header to bypass warning page
-    if (window.location.hostname.includes('loca.lt')) {
-       options.extraHeaders = { "ngrok-skip-browser-warning": "true" };
-    }
-
-    const newSocket = io(SERVER_URL, options);
+    // Connect to Backend
+    // Note: Render free tier spins down. We need robust retry logic (built-in to socket.io)
+    const newSocket = io(SERVER_URL, {
+        transports: ['websocket', 'polling'], // Try websocket first
+        reconnection: true,
+        reconnectionAttempts: 20, // Try for a while (wakeup can take 60s)
+        reconnectionDelay: 1000,
+    });
     setSocket(newSocket);
 
     // Join or Create Room
     const event = isCreate ? 'create-room' : 'join-room';
     
-    newSocket.emit(event, { roomId, password, userName: user.name }, (response) => {
-      if (!response.success) {
-        // If we tried to create but it exists (e.g. reload), try joining instead
-        if (isCreate && response.message === "Room ID already exists.") {
-            newSocket.emit('join-room', { roomId, password, userName: user.name }, (joinRes) => {
-                if (joinRes.success) {
-                    setRoomState(joinRes.room);
+    // Connection listener to ensure we don't emit before connected
+    const triggerJoin = () => {
+        if(newSocket.connected) {
+            newSocket.emit(event, { roomId, password, userName: user.name }, (response) => {
+                if (!response.success) {
+                    // Auto-fix: If failed to create because exists, try joining
+                    if (isCreate && response.message === "Room ID already exists.") {
+                        newSocket.emit('join-room', { roomId, password, userName: user.name }, (joinRes) => {
+                            if (joinRes.success) {
+                                setRoomState(joinRes.room);
+                            } else {
+                                setError(joinRes.message);
+                            }
+                        });
+                    } else {
+                        setError(response.message);
+                    }
                 } else {
-                    setError(joinRes.message);
+                    setRoomState(response.room);
                 }
             });
-        } else {
-            setError(response.message);
         }
-      } else {
-        setRoomState(response.room);
-      }
-    });
+    };
+
+    newSocket.on('connect', triggerJoin);
+    
+    // Fallback if already connected fast
+    if(newSocket.connected) triggerJoin();
 
     newSocket.on('user-joined', ({ userName }) => {
       // Could show toast
@@ -78,9 +89,10 @@ export default function Room({ user }) {
     });
 
     return () => {
-      newSocket.disconnect();
+        newSocket.off('connect', triggerJoin);
+        newSocket.disconnect();
     };
-  }, [roomId, password, user.name, navigate]);
+  }, [roomId, password, user.name, navigate]); // Removed isCreate from dependency to avoid loop
 
   // Derived State
   const myUser = roomState?.users.find(u => u.id === socket?.id);
@@ -117,16 +129,21 @@ export default function Room({ user }) {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-black text-red-500">
-        <h2 className="text-2xl font-bold">{error}</h2>
+      <div className="flex h-[100dvh] items-center justify-center bg-black text-red-500 p-4 text-center">
+        <div>
+           <h2 className="text-2xl font-bold mb-4">{error}</h2>
+           <button onClick={() => navigate('/')} className="px-4 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700">Back to Home</button>
+        </div>
       </div>
     );
   }
 
   if (!roomState) {
     return (
-      <div className="flex h-screen items-center justify-center bg-black text-white">
-        <div className="animate-spin h-8 w-8 border-4 border-red-500 rounded-full border-t-transparent"></div>
+      <div className="flex flex-col h-[100dvh] items-center justify-center bg-black text-white space-y-4">
+        <div className="animate-spin h-10 w-10 border-4 border-red-500 rounded-full border-t-transparent"></div>
+        <p className="animate-pulse">Connecting to Server...</p>
+        <p className="text-xs text-neutral-500 max-w-xs text-center">(Takes up to 60s if server is waking up)</p>
       </div>
     );
   }
