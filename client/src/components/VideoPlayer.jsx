@@ -318,7 +318,10 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
       {/* Local File Picker Overlay (If not loaded) */}
       {/* Local File Picker Overlay (If not loaded) */}
       {!localFileUrl && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-neutral-900/90 text-white">
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-neutral-900/90 text-white"
+        >
           <FileVideo size={64} className="mb-4 text-neutral-500" />
           <h3 className="text-xl font-bold mb-2">Load Video File</h3>
           <p className="text-neutral-400 mb-6">Choose the video file to sync.</p>
@@ -331,7 +334,10 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
 
       {/* Handshake Overlay (Loaded but not pressed Play) */}
       {localFileUrl && !activeSync && (
-         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm text-white">
+         <div 
+           onClick={(e) => e.stopPropagation()}
+           className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm text-white"
+         >
            <h3 className="text-2xl font-bold mb-4">Waiting for Room to Sync</h3>
            <div className="flex gap-4">
              <div className="text-center">
@@ -385,6 +391,7 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
 
       {/* HUD / Controls */}
       <div 
+        onClick={(e) => e.stopPropagation()}
         className={clsx(
           "absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent px-4 py-4 transition-opacity duration-300",
           showControls || !isPlaying ? "opacity-100" : "opacity-0"

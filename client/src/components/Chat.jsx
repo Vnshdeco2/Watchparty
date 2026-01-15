@@ -58,7 +58,9 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
   }
 
   return (
-    <div className={clsx(
+    <div 
+      onClick={(e) => e.stopPropagation()}
+      className={clsx(
       "flex flex-col transition-all duration-300",
       isOverlay 
         ? clsx(
