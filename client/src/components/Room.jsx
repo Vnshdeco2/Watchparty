@@ -25,6 +25,7 @@ export default function Room({ user }) {
   // My State
   const [isFileLoaded, setIsFileLoaded] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [typingUsers, setTypingUsers] = useState(new Set()); // Track who is typing
 
   useEffect(() => {
     console.log("Connecting to Server:", SERVER_URL);
@@ -96,6 +97,15 @@ export default function Room({ user }) {
       });
     });
 
+    newSocket.on('user-typing', ({ userName, isTyping }) => {
+        setTypingUsers(prev => {
+            const next = new Set(prev);
+            if (isTyping) next.add(userName);
+            else next.delete(userName);
+            return next;
+        });
+    });
+
     return () => {
         newSocket.off('connect', triggerJoin);
         newSocket.disconnect();
@@ -120,6 +130,12 @@ export default function Room({ user }) {
       setMessages(prev => [...prev, tempMsg]);
 
       socket.emit('send-message', { roomId, message: text, userName: user.name });
+    }
+  };
+
+  const handleTyping = (isTyping) => {
+    if (socket) {
+        socket.emit('typing', { roomId, userName: user.name, isTyping });
     }
   };
 
@@ -194,6 +210,8 @@ export default function Room({ user }) {
           messages={messages} 
           onSendMessage={handleSendMessage} 
           user={{ ...user, socketId: socket?.id }}
+          typingUsers={Array.from(typingUsers)}
+          onTyping={handleTyping}
         />
       </div>
 
@@ -210,7 +228,9 @@ export default function Room({ user }) {
           chatProps={{ 
             messages, 
             onSendMessage: handleSendMessage, 
-            user: { ...user, socketId: socket?.id } 
+            user: { ...user, socketId: socket?.id },
+            typingUsers: Array.from(typingUsers),
+            onTyping: handleTyping
           }}
         />
       </div>

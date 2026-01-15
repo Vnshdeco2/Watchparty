@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, X } from 'lucide-react';
 import { clsx } from 'clsx';
 
-export default function Chat({ messages, onSendMessage, user, isOverlay = false, isOpen = false, onOpen, onClose }) {
+export default function Chat({ messages, onSendMessage, user, isOverlay = false, isOpen = false, onOpen, onClose, typingUsers = [], onTyping }) {
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
   const [now, setNow] = useState(Date.now());
 
   // Auto-scroll
@@ -19,11 +20,30 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
     return () => clearInterval(interval);
   }, [isOverlay, isOpen]);
 
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setInputText(val);
+
+    if (onTyping) {
+        onTyping(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            onTyping(false);
+        }, 2000);
+    }
+  };
+
   const handleSend = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     onSendMessage(inputText);
     setInputText('');
+    
+    // Clear typing immediately
+    if (onTyping) {
+        onTyping(false);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
   };
 
   // Filter for overlay:
@@ -96,6 +116,12 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
             </div>
           );
         })}
+        {/* Typing Indicator */}
+        {typingUsers.length > 0 && (
+            <div className="text-xs text-neutral-500 italic px-2 pb-1 animate-pulse">
+                {typingUsers.join(', ')} is typing...
+            </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -110,7 +136,7 @@ export default function Chat({ messages, onSendMessage, user, isOverlay = false,
           <input
             type="text"
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleInput}
             placeholder="Type a message..."
             className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-full pl-4 pr-10 py-2 focus:outline-none focus:border-red-500 text-sm shadow-lg"
           />

@@ -123,6 +123,10 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('receive-message', chatMsg);
   });
 
+  socket.on('typing', ({ roomId, userName, isTyping }) => {
+     socket.to(roomId).emit('user-typing', { userName, isTyping });
+  });
+
   // --- Disconnect ---
 
   socket.on('disconnect', () => {
