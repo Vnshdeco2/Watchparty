@@ -130,7 +130,8 @@ export default function VideoPlayer({ socket, roomId, isReady, onReady, file, on
       }
 
       // Reset flag after a tick
-      setTimeout(() => { isRemoteUpdate.current = false; }, 50);
+      // Increased to 500ms to prevent "seek-echo" loops where onSeeked fires after the flag was cleared
+      setTimeout(() => { isRemoteUpdate.current = false; }, 500);
     };
 
     socket.on('sync-action', handleSync);
